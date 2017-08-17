@@ -1,0 +1,344 @@
+package com.sample
+ 
+dialect "java"
+
+import com.pub.pojo.para.Basic;
+import com.pub.pojo.fact.PreStart;
+//import  java.util.Date ;
+
+import com.pub.pojo.fact.Pressure;
+import com.pub.pojo.fact.Pump;
+import com.pub.model.Timer;
+import com.pub.pojo.fact.Timestamp;
+import com.pub.pojo.fact.PStatus;
+import com.pub.pojo.fact.Pipeline;
+import com.pub.mq.Data;
+global com.sample.DroolsService services
+
+rule "Update Pump Mode if any"
+ ruleflow-group "Update Pump Mode if any"
+ no-loop
+    when 
+       $pl: Pipeline()
+       $bs:Basic()
+       $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+        Thread.sleep(1000);
+        if(services.isDataUpdated(Data.PumpMode)) //isDataUpdate(Data data, double offset)
+        {
+           services.updateData(Data.PumpMode);
+           update($pl);
+           $bs.isPumpModeUpdated=true;
+           update($bs);
+        }
+        else {
+           $bs.isPumpModeUpdated=false;
+           update($bs);
+        }
+       
+end
+
+rule "Stop Local Mode Pump"
+ ruleflow-group "Stop Local Mode Pump"
+ no-loop
+    when 
+        $pl:Pipeline() 
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+    
+        //$Pold.cmdSpeed=$nmin;
+        for(int i=0;i<$pl.pumps.length;i++){
+            if($pl.pumps[i].offline){
+                $pl.pumps[i].cmdSpeed=0;
+                services.move(i+1);
+            }
+        }
+      
+        //wait till motion  done
+        services.updateData(Data.PumpSpeed);
+        services.updateData(Data.PumpRunning);
+        
+        update($pl);
+        //System.out.println("new pump "+newPumpNo+" cmdspeed "+   $pl.pumps[newPumpNo-1].cmdSpeed+" speed "+  $pl.pumps[newPumpNo-1].speed);
+end
+
+
+//no yet done rule
+rule "Reassign Lead and Duty if need"
+ ruleflow-group "Reassign Lead and Duty if need"
+ no-loop
+    when 
+        $pl:Pipeline()
+        $bs:Basic()
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+      
+        for(Pump pm:$pl.pumps) {
+            if (pm.offline){
+                if(pm.lead==true&&pm.duty==true){ 
+                    $bs.isPumpLeadDutyOffline=true;
+                    pm.lead=false;
+                    pm.duty=false;
+                }
+                else {
+                
+                    $bs.isPumpLeadDutyOffline=false;
+                    int newPumpNo;
+                   
+                    if (pm.lead==true){
+                        pm.lead=false;
+                        newPumpNo=$pl.getNextOnlinePumpNo(pm.pumpNo);
+                        $pl.pumps[newPumpNo-1].lead=true;
+                    }
+                    else if (pm.duty==true){
+                        pm.duty=false;
+                        newPumpNo=$pl.getPrevOnlinePumpNo(pm.pumpNo);
+                        $pl.pumps[newPumpNo-1].duty=true;
+                    }
+                }
+            } 
+        }
+        
+      update($pl);
+      update($bs);
+              
+end
+
+
+rule "Update Realtime PD PS"
+ ruleflow-group "Update Realtime PD PS"
+ no-loop
+    when 
+       $pd:Pressure(name=="PD")
+       $ps:Pressure(name=="PS")
+       $bs:Basic()
+       $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+         Thread.sleep(1000);
+        if(services.isDataUpdated(Data.PD))
+        {
+           services.updateData(Data.PD);
+           update($pd);
+        }
+        
+        if(services.isDataUpdated(Data.PS,1)) //isDataUpdate(Data data, double offset)
+        {
+           services.updateData(Data.PS);
+           update($ps);
+           $bs.isPSUpdated=true;
+           update($bs);
+        }
+        else {
+           $bs.isPSUpdated=false;
+           update($bs);
+        }
+end
+
+rule "Update Realtime PD 1"
+ ruleflow-group "Update Realtime PD 1"
+ no-loop
+    when 
+       $pd:Pressure(name=="PD")
+       $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+         Thread.sleep(1000);
+        if(services.isDataUpdated(Data.PD))
+        {
+           services.updateData(Data.PD);
+           update($pd);
+        }
+end
+       
+rule "Test Rule"
+ ruleflow-group "Test Rule"
+ no-loop
+    when 
+       $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+"test rule");
+        
+      
+end
+              
+rule "Rule 2"
+ ruleflow-group "Rule 2"
+ no-loop
+    when 
+       $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+"Rule 2");
+        
+      
+end
+rule "if Duty Pump N Equal Nmax for 1min"
+ ruleflow-group "if Duty Pump N Equal Nmax for 1min"
+ no-loop
+    when 
+   $pl: Pipeline($pms:pumps)
+     $bs:Basic($min:Nmin)
+    $pm:Pump(duty==true) from $pms
+   
+       $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+       
+         System.out.println($pm.pumpNo+" "+$pm.speed +" "+$pm.cmdSpeed+" "+$pm.lead+" "+$pm.duty);
+        
+         Timer timer = new Timer();
+    	while (true) {
+            if(services.isDataUpdated(Data.Pump))
+            {
+                services.updateData(Data.Pump);
+                update($pl);
+                }
+				if ($pm.speed == $bs.Nmax) {
+					// low limit
+					if (!timer.isBegin())
+						timer.Begin();
+				} else
+					timer.Reset();
+
+				if (timer.GetElapsedTime() > 5000)
+					break;
+               Thread.sleep(100);
+			}
+end
+
+rule "New Pump Start Nmin"
+ ruleflow-group "New Pump Start Nmin"
+ no-loop
+    when 
+        $pl:Pipeline() 
+       // PreStart($nstart:N_Start)
+       Basic($nmin:Nmin)
+        $Pold: Pump(duty==true) from $pl.pumps
+       
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+    
+        //$Pold.cmdSpeed=$nmin;
+        $Pold.duty=false;
+        int newPumpNo=$Pold.pumpNo+1>$pl.pumps.length?1:$Pold.pumpNo+1;
+        $pl.pumps[newPumpNo-1].duty=true; 
+        $pl.pumps[newPumpNo-1].cmdSpeed=$nmin;
+        
+        //wait till motion  done
+        services.move(newPumpNo);
+        services.updateData(Data.PumpRunning);
+        services.updateData(Data.PumpSpeed);
+        update($pl);
+        System.out.println("new pump "+newPumpNo+" cmdspeed "+   $pl.pumps[newPumpNo-1].cmdSpeed+" speed "+  $pl.pumps[newPumpNo-1].speed);
+end
+
+rule "Keep Present Operation"
+ ruleflow-group "Keep Present Operation"
+ no-loop
+    when 
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+end
+
+rule "Auto Reduce DP"
+ ruleflow-group "Auto Reduce DP"
+ no-loop
+    when 
+        $dp: Pressure(name=="DP")
+        $pd:Pressure(name=="PD")
+       
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+        $dp.value=$pd.value;
+        update($dp);
+end
+
+rule "Manual Reduce DP"
+ ruleflow-group "Manual Reduce DP"
+ no-loop
+    when 
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+end
+
+rule "Calculate Duty Pump Speed"
+ ruleflow-group "Calculate Duty Pump Speed"
+ no-loop
+    when 
+        $pl:Pipeline()
+        $bs:Basic($min:Nmin,$max:Nmax)
+        $pm:Pump(duty==true) from $pl.pumps
+        $preStart:PreStart()
+        Pressure(name=="DP",DP:value)
+        Pressure(name=="PD",PD:value)
+         
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+        double step =100;
+        if(PD<DP-$preStart.dpTol)
+        {
+            //if($pm.speed<$min)
+           // $pm.cmdSpeed=$min;
+           //else
+            $pm.cmdSpeed=($pm.speed+step)>$max?$max:$pm.speed+step;
+        }
+        else 
+        {
+           $pm.cmdSpeed=$pm.speed-step<$min?$min:$pm.speed-step;
+        }
+     
+        services.move($pm.pumpNo);
+        services.updateData(Data.PumpSpeed);
+        services.updateData(Data.PumpRunning);
+    // $pm.speed=$pm.cmdSpeed;
+        update($pl);
+        System.out.println("pump "+$pm.pumpNo+" cmdspeed "+ $pm.cmdSpeed+" speed "+$pm.speed);
+      
+end
+
+rule "Output Duty Pump Speed"
+ ruleflow-group "Output Duty Pump Speed"
+ no-loop
+    when 
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+end
+
+
+rule "Varify Duty Pump Speed"
+ ruleflow-group "Varify Duty Pump Speed"
+ no-loop
+    when 
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+end

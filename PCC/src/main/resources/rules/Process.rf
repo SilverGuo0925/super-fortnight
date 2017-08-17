@@ -1,0 +1,296 @@
+<?xml version="1.0" encoding="UTF-8"?> 
+<process xmlns="http://drools.org/drools-5.0/process"
+         xmlns:xs="http://www.w3.org/2001/XMLSchema-instance"
+         xs:schemaLocation="http://drools.org/drools-5.0/process drools-processes-5.0.xsd"
+         type="RuleFlow" name="Process" id="Process" package-name="com.sample" >
+
+  <header>
+    <imports>
+      <import name="com.pub.pojo.para.Basic" />
+      <import name="com.pub.pojo.fact.PreStart" />
+      <import name="com.pub.pojo.fact.Pressure" />
+      <import name="com.pub.pojo.fact.Pump" />
+      <import name="com.pub.pojo.fact.Pseudo" />
+      <import name="com.pub.pojo.fact.Pipeline" />
+    </imports>
+  </header>
+
+  <nodes>
+    <ruleSet id="2" name="Lead Pump Start Nmin" x="298" y="867" width="174" height="49" ruleFlowGroup="Lead Pump Start Nmin" />
+    <ruleSet id="13" name="if PD&lt;DP-tol for 1min" x="234" y="786" width="244" height="49" ruleFlowGroup="if PD Low Limit Trigger" />
+    <end id="14" name="End" x="1637" y="1320" width="155" height="49" />
+    <start id="15" name="Start" x="190" y="27" width="182" height="49" />
+    <split id="16" name="If any pump running" x="260" y="599" width="182" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-209</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="44" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+        <constraint toNodeId="17" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >Pipeline($pms:pumps)
+Pump(mode==PMode.Auto, trip==false,running==true) from $pms</constraint>
+      </constraints>
+    </split>
+    <ruleSet id="17" name="Freeze All Pump Speed" x="521" y="594" width="209" height="49" ruleFlowGroup="Freeze All Pump Speed" />
+    <split id="19" name="if Duty Pump = Lead Pump ?" x="818" y="725" width="182" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-221</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="34" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >Pipeline($pms:pumps)
+Pump(duty==true,lead==true) from $pms</constraint>
+        <constraint toNodeId="20" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+      </constraints>
+    </split>
+    <ruleSet id="20" name="Ajust All Pump Speed to Nmax" x="812" y="824" width="244" height="49" ruleFlowGroup="Ajust All Pump Speed to Nmax" />
+    <split id="21" name="if PD Hit Low Limit?" x="294" y="1155" width="126" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-73</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="23" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >$pd:Pressure(name=="PD")
+Pressure(name=="DP",value&gt;$pd.value+0.5)</constraint>
+        <constraint toNodeId="60" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+      </constraints>
+    </split>
+    <split id="22" name="if PD Hit High Limit" x="742" y="995" width="182" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-224</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="35" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+        <constraint toNodeId="38" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >Pressure(name=="DP",$dp:value)
+Pressure(name=="PD",value&gt;$dp+0.5)</constraint>
+      </constraints>
+    </split>
+    <split id="23" name="if Duty Pump N=Nmax?" x="346" y="1332" width="182" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-75</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="25" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >$pl:Pipeline()
+Basic($max:Nmax)
+Pump(duty==true,speed==$max) from $pl.pumps</constraint>
+        <constraint toNodeId="41" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+      </constraints>
+    </split>
+    <ruleSet id="24" name="Calculate Duty Pump Speed" x="765" y="1343" width="182" height="49" ruleFlowGroup="Calculate Duty Pump Speed" />
+    <ruleSet id="25" name="if Duty Pump N Equal Nmax for 1min" x="256" y="1417" width="209" height="49" ruleFlowGroup="if Duty Pump N Equal Nmax for 1min" />
+    <split id="26" name="if Max Pump in Operation?" x="337" y="1517" width="182" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-78</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="27" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >PreStart($max:maxRunPump)
+$pl:Pipeline()
+Pump(duty==true,pumpNo==$max) from $pl.pumps</constraint>
+        <constraint toNodeId="31" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+      </constraints>
+    </split>
+    <split id="27" name="if Prompt User?" x="346" y="1623" width="209" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-79</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="28" toType="DROOLS_DEFAULT" name="option 1" priority="1" type="rule" dialect="mvel" >Pseudo(puiNextAction==1)</constraint>
+        <constraint toNodeId="29" toType="DROOLS_DEFAULT" name="option 2" priority="1" type="rule" dialect="mvel" >Pseudo(puiNextAction==2)</constraint>
+        <constraint toNodeId="30" toType="DROOLS_DEFAULT" name="option 3" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+      </constraints>
+    </split>
+    <ruleSet id="28" name="Keep Present Operation" x="258" y="1732" width="182" height="49" ruleFlowGroup="Keep Present Operation" />
+    <ruleSet id="29" name="Auto Reduce DP" x="759" y="1735" width="182" height="49" ruleFlowGroup="Auto Reduce DP" />
+    <ruleSet id="30" name="Manual Reduce DP" x="515" y="1739" width="182" height="49" ruleFlowGroup="Manual Reduce DP" />
+    <ruleSet id="31" name="New Pump Start Nmin" x="466" y="1445" width="209" height="49" ruleFlowGroup="New Pump Start Nmin" />
+    <ruleSet id="33" name="Assign Lead and Duty if need" x="817" y="612" width="182" height="49" ruleFlowGroup="Assign Lead and Duty if need" />
+    <join id="34" name="Gateway" x="506" y="878" width="174" height="49" type="2" />
+    <join id="35" name="Gateway" x="445" y="975" width="155" height="49" type="2" />
+    <ruleSet id="36" name="Output Duty Pump Speed" x="1011" y="1343" width="182" height="49" ruleFlowGroup="Output Duty Pump Speed" />
+    <ruleSet id="37" name="Varify Duty Pump Speed" x="1245" y="1346" width="179" height="49" ruleFlowGroup="Varify Duty Pump Speed" />
+    <split id="38" name="if Duty Pump = Lead Pump ?" x="747" y="1082" width="209" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-239</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="39" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+        <constraint toNodeId="63" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >$pl:Pipeline()
+Pump(lead==true &amp;&amp; duty==true) from $pl.pumps</constraint>
+      </constraints>
+    </split>
+    <split id="39" name="if duty pump N =Nmin?" x="962" y="1099" width="182" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-240</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="45" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >$pl:Pipeline()
+Basic($min:Nmin)
+Pump(duty==true,speed==$min) from $pl.pumps</constraint>
+        <constraint toNodeId="62" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+      </constraints>
+    </split>
+    <split id="40" name="if lead pump N=Nmin?" x="739" y="1191" width="182" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-241</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="41" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+        <constraint toNodeId="42" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >$pl: Pipeline()
+Basic($min:Nmin)
+Pump(lead==true,speed==$min) from $pl.pumps</constraint>
+      </constraints>
+    </split>
+    <join id="41" name="Gateway" x="733" y="1260" width="209" height="49" type="2" />
+    <ruleSet id="42" name="if Lead Pump N Equal Nmin for 2min" x="941" y="1212" width="209" height="49" ruleFlowGroup="if Lead Pump N Equal Nmin for 2min" />
+    <ruleSet id="43" name="Stop Lead Pump" x="1295" y="1224" width="132" height="49" ruleFlowGroup="Stop Lead Pump" />
+    <join id="44" name="Gateway" x="267" y="689" width="182" height="49" type="2" />
+    <ruleSet id="45" name="if Duty Pump N Equal Nmin for 1min" x="1108" y="1074" width="209" height="49" ruleFlowGroup="if Duty Pump N Equal Nmin for 1min" />
+    <ruleSet id="46" name="Stop Duty Pump" x="1349" y="1067" width="182" height="49" ruleFlowGroup="Stop Duty Pump" />
+    <ruleSet id="47" name="Set Pn-1 as Duty Pump" x="1353" y="969" width="182" height="49" ruleFlowGroup="Set Pn-1 as Duty Pump" />
+    <split id="48" name="Gateway" x="1520" y="1327" width="174" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-249</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="14" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+        <constraint toNodeId="35" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >Pipeline()</constraint>
+      </constraints>
+    </split>
+    <ruleSet id="49" name="Calculate Optimum Pump Operating Zone" x="153" y="126" width="244" height="49" ruleFlowGroup="Calculate Optimum Pump Operating Zone" />
+    <ruleSet id="50" name="Calculate Total Head (H)" x="181" y="284" width="155" height="49" ruleFlowGroup="Calculate Total Head H" />
+    <join id="51" name="Gateway" x="358" y="203" width="174" height="49" type="2" />
+    <ruleSet id="52" name="Prompt User to Re-enter DP" x="500" y="224" width="244" height="49" ruleFlowGroup="Prompt User to Re Enter DP" />
+    <split id="53" name="Gateway" x="228" y="399" width="49" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-105</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="56" toType="DROOLS_DEFAULT" name="too low" priority="1" type="rule" dialect="mvel" >Basic(H&lt;A4)</constraint>
+        <constraint toNodeId="57" toType="DROOLS_DEFAULT" name="good" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+        <constraint toNodeId="54" toType="DROOLS_DEFAULT" name="too high" priority="1" type="rule" dialect="mvel" >PreStart($a1:A1)
+Basic(H&gt;=$a1)</constraint>
+      </constraints>
+    </split>
+    <actionNode id="54" name="DP Too High" x="481" y="424" width="126" height="49" >
+        <action type="expression" dialect="java" >System.out.println("DP Too High");</action>
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-255</value>
+      </metaData>
+    </actionNode>
+    <join id="55" name="Gateway" x="741" y="461" width="182" height="49" type="2" />
+    <actionNode id="56" name="DP Too Low" x="487" y="321" width="126" height="49" >
+        <action type="expression" dialect="java" >System.out.println("DP Too Low");</action>
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-257</value>
+      </metaData>
+    </actionNode>
+    <ruleSet id="57" name="Calculate Nmin Nmax" x="219" y="522" width="126" height="49" ruleFlowGroup="Calculate Nmin Nmax" />
+    <ruleSet id="59" name="Update Pump Mode if any" x="107" y="841" width="153" height="48" ruleFlowGroup="Update Pump Mode if any" />
+    <ruleSet id="60" name="Update Realtime PD 1" x="505" y="1081" width="134" height="48" ruleFlowGroup="Update Realtime PD 1" />
+    <ruleSet id="61" name="Update Realtime PD PS" x="126" y="1066" width="140" height="48" ruleFlowGroup="Update Realtime PD PS" />
+    <ruleSet id="62" name="Test Rule" x="847" y="1256" width="80" height="48" ruleFlowGroup="Test Rule" />
+    <ruleSet id="63" name="Rule 2" x="790" y="1148" width="80" height="48" ruleFlowGroup="Rule 2" />
+    <split id="64" name="is PS updated in fact ?" x="327" y="1008" width="49" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-302</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="51" toType="DROOLS_DEFAULT" name="Yes" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+        <constraint toNodeId="21" toType="DROOLS_DEFAULT" name="No" priority="1" type="rule" dialect="mvel" >Basic(isPSUpdated==false)</constraint>
+      </constraints>
+    </split>
+    <split id="65" name="if Any Pump Mode Switched?" x="241" y="942" width="49" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-50</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="67" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+        <constraint toNodeId="68" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >Basic(isPumpModeUpdated==true)</constraint>
+      </constraints>
+    </split>
+    <ruleSet id="66" name="Reassign Lead and Duty if need" x="-9" y="1013" width="177" height="48" ruleFlowGroup="Reassign Lead and Duty if need" />
+    <join id="67" name="Gateway" x="209" y="992" width="49" height="49" type="2" />
+    <ruleSet id="68" name="Stop Local Mode Pump" x="23" y="916" width="158" height="48" ruleFlowGroup="Stop Local Mode Pump" />
+    <split id="69" name="if Lead Duty Pump Offline?" x="46" y="799" width="49" height="49" type="2" >
+      <metaData name="UniqueId">
+        <value>_jbpm-unique-54</value>
+      </metaData>
+      <constraints>
+        <constraint toNodeId="44" toType="DROOLS_DEFAULT" name="Yes" priority="1" type="rule" dialect="mvel" >Basic(isPumpLeadDutyOffline==true)</constraint>
+        <constraint toNodeId="67" toType="DROOLS_DEFAULT" name="No" priority="2" type="rule" dialect="mvel" >eval(true)</constraint>
+      </constraints>
+    </split>
+  </nodes>
+
+  <connections>
+    <connection from="13" to="2" />
+    <connection from="44" to="13" />
+    <connection from="48" to="14" />
+    <connection from="57" to="16" />
+    <connection from="16" to="17" />
+    <connection from="33" to="19" />
+    <connection from="19" to="20" />
+    <connection from="64" to="21" />
+    <connection from="60" to="22" />
+    <connection from="21" to="23" />
+    <connection from="41" to="24" />
+    <connection from="23" to="25" />
+    <connection from="25" to="26" />
+    <connection from="26" to="27" />
+    <connection from="27" to="28" />
+    <connection from="27" to="29" />
+    <connection from="27" to="30" />
+    <connection from="26" to="31" />
+    <connection from="17" to="33" />
+    <connection from="19" to="34" />
+    <connection from="20" to="34" />
+    <connection from="34" to="35" />
+    <connection from="47" to="35" />
+    <connection from="48" to="35" />
+    <connection from="28" to="35" />
+    <connection from="2" to="35" />
+    <connection from="31" to="35" />
+    <connection from="22" to="35" />
+    <connection from="24" to="36" />
+    <connection from="36" to="37" />
+    <connection from="22" to="38" />
+    <connection from="38" to="39" />
+    <connection from="63" to="40" />
+    <connection from="23" to="41" />
+    <connection from="40" to="41" />
+    <connection from="62" to="41" />
+    <connection from="40" to="42" />
+    <connection from="42" to="43" />
+    <connection from="16" to="44" />
+    <connection from="43" to="44" />
+    <connection from="69" to="44" />
+    <connection from="39" to="45" />
+    <connection from="45" to="46" />
+    <connection from="46" to="47" />
+    <connection from="37" to="48" />
+    <connection from="15" to="49" />
+    <connection from="51" to="50" />
+    <connection from="49" to="51" />
+    <connection from="52" to="51" />
+    <connection from="29" to="51" />
+    <connection from="64" to="51" />
+    <connection from="55" to="52" />
+    <connection from="50" to="53" />
+    <connection from="53" to="54" />
+    <connection from="54" to="55" />
+    <connection from="56" to="55" />
+    <connection from="30" to="55" />
+    <connection from="53" to="56" />
+    <connection from="53" to="57" />
+    <connection from="35" to="59" />
+    <connection from="21" to="60" />
+    <connection from="67" to="61" />
+    <connection from="39" to="62" />
+    <connection from="38" to="63" />
+    <connection from="61" to="64" />
+    <connection from="59" to="65" />
+    <connection from="68" to="66" />
+    <connection from="65" to="67" />
+    <connection from="69" to="67" />
+    <connection from="65" to="68" />
+    <connection from="66" to="69" />
+  </connections>
+
+</process>

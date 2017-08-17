@@ -1,0 +1,60 @@
+
+
+package com.sample
+// importing classes
+import com.pub.model.InitTick;
+import com.pub.model.StartTick;
+// default dialect for the semantic code will be MVEL
+dialect "java"
+ 
+global com.sample.DroolsService services
+// tells the engine that a StockTick instance will assume the
+// role (semantics) of events and that the default retention
+// policy will be 2 minutes
+declare InitTick
+    @role( event )
+end 
+
+
+// a simple rule to show that it is possible to join
+// events from an entry-point (stream) with facts
+// present in the working memory
+rule "if event exist"
+    agenda-group "evaluation"
+    lock-on-active
+when
+    InitTick() from entry-point "Init stream"
+then
+    // This shows an update on working memory facts with data from joined events
+ 	System.out.println("[" + System.currentTimeMillis() + "]");
+end
+
+rule "evaluation done"
+    agenda-group "evaluation"
+    salience -10
+when
+    InitTick( ) from entry-point "Init stream"
+then
+    drools.setFocus( "start" );
+end
+// this rule shows a trick to get the last available event as well as
+// how to call global services from the consequence
+rule "if start"
+    enabled true
+    agenda-group "start"
+when
+  it:InitTick( $ts : timestamp ) from entry-point "Init stream"
+  not( InitTick(  timestamp > $ts ) from entry-point "Init stream" )
+  
+then
+    
+    // we also want to create an event and forward it into the engine to a predefined entry point
+    // that is being listened by other rules
+ 
+ //   drools.getEntryPoint("Pump Events").insert( new PumpTick() );
+   drools.getEntryPoint("Analysis Events").insert( new StartTick()  );
+end
+
+
+
+

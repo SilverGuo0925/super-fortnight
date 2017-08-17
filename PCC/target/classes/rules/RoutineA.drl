@@ -1,0 +1,130 @@
+package com.sample
+ 
+dialect "java"
+
+import com.pub.pojo.para.Basic;
+import com.pub.pojo.fact.PreStart;
+//import  java.util.Timer ;
+
+import com.pub.pojo.fact.Pressure;
+import com.pub.pojo.fact.Pump;
+import com.pub.pojo.fact.Timestamp;
+import com.pub.mq.Data;
+global com.sample.DroolsService services
+
+declare StartTick
+    @role( event )
+end
+
+// here we have an example of a rule that controls a process
+rule "Start RoutineA process"
+when
+    $st : StartTick( ) from entry-point "Analysis Events"
+then
+    
+    drools.getKnowledgeRuntime().startProcess( "Process" );
+end
+
+
+rule  "Calculate Optimum Pump Operating Zone"
+ ruleflow-group "Calculate Optimum Pump Operating Zone"
+ no-loop
+    when
+        PreStart(a1:A1,a2:A2,n_Start:N_Start,n_Rated:N_Rated)
+        basic: Basic()
+        
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+      
+        double a4=  a1/(Math.pow(n_Rated/n_Start,2));
+        double a3=  a2/(Math.pow(n_Rated/n_Start,2));
+        basic.setA3(a3);
+        basic.setA4(a4);
+        update (basic);
+        System.out.println( "A1 A2 A3 A4 "+a1+" "+a2+" "+basic.getA3()+ " "+ basic.getA4());
+end
+
+rule  "Calculate Total Head H"
+ ruleflow-group "Calculate Total Head H"
+ no-loop
+    when
+        PreStart(a1:A1,a2:A2,rh:RH)
+        basic: Basic(a3:A3,a4:A4)
+        $dp:Pressure(name=="DP",DP:value)
+        $ps:Pressure(name=="PS",PS:value)
+         
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+        if(services.isDataUpdated(Data.PS))
+        {
+           services.updateData(Data.PS);
+           update($ps);
+        }
+        double h=DP-PS-rh;
+        basic.setH(h);
+        update(basic);
+        System.out.println( "H=DP-PS-RH "+basic.getH()+"="+DP+"-"+PS+"-"+rh);
+end
+
+rule  "Calculate Nmin Nmax"
+ ruleflow-group "Calculate Nmin Nmax"
+ no-loop
+    when
+        PreStart(a1:A1,a2:A2,n_Rated:N_Rated)
+        basic: Basic(a3:A3,a4:A4,h:H)
+    
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+        double Nmax,Nmin;
+        if(h>a2&&h<a1)
+        {
+           Nmax=n_Rated;
+           Nmin=Math.sqrt(h/a1)*n_Rated;
+        }
+        else 
+        {
+           Nmax=Math.sqrt(h/a2)*n_Rated;
+           Nmin=Math.sqrt(h/a1)*n_Rated;
+        }
+        basic.setNmax((int)Nmax);
+        basic.setNmin((int)Nmin);
+        update(basic);
+        System.out.println( "Nmax Nmin "+basic.getNmax()+" "+basic.getNmin());
+
+end
+
+rule "Prompt User to Re Enter DP"
+    ruleflow-group "Prompt User to Re Enter DP"
+    no-loop
+    when 
+        $dp: Pressure(name=="DP",$ve:value)
+   
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+        //double oldValue=$ve;
+        while(true)
+        {
+           if(System.currentTimeMillis()-$ts.currentTimeMillis>5000)
+           break;
+          //if($dp.value!=oldValue)
+           if(services.isDataUpdated(Data.DP))
+            {
+                services.updateData(Data.DP);
+                update($dp);
+                System.out.println(" update($dp);"); 
+                break;
+            }
+          Thread.sleep(100);
+        }
+end

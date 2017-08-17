@@ -1,0 +1,129 @@
+package com.sample
+ 
+dialect "java"
+
+import com.pub.pojo.para.Basic;
+import com.pub.pojo.fact.PreStart;
+import  java.util.Date ;
+
+import com.pub.pojo.fact.Pressure;
+import com.pub.pojo.fact.Pump;
+import com.pub.model.Timer;
+import com.pub.pojo.fact.Timestamp;
+import com.pub.pojo.fact.PStatus;
+import com.pub.pojo.fact.Pipeline;
+import com.pub.mq.Data;
+global com.sample.DroolsService services
+
+
+rule "if Lead Pump N Equal Nmin for 2min"
+ ruleflow-group "if Lead Pump N Equal Nmin for 2min"
+ no-loop
+    when 
+         $pl:Pipeline()
+         $pm:Pump(lead==true) from $pl.pumps
+         $bs:Basic()
+    
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+           Timer timer = new Timer();
+    	while (true) {
+             if(services.isDataUpdated(Data.Pump))
+                services.updateData(Data.Pump);
+				if ($pm.speed == $bs.Nmin) {
+					// low limit
+					if (!timer.isBegin())
+						timer.Begin();
+				} else
+					timer.Reset();
+
+				if (timer.GetElapsedTime() > 10000)
+					break;
+               Thread.sleep(100);
+			}
+end
+
+rule "Stop Lead Pump"
+ ruleflow-group "Stop Lead Pump"
+ no-loop
+    when 
+        $pl:Pipeline()
+        $pm:Pump(lead==true) from $pl.pumps
+        
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+        $pm.cmdSpeed=0;
+        $pm.lead=false;
+        services.move($pm.pumpNo);
+        update($pl);
+end
+
+rule "if Duty Pump N Equal Nmin for 1min"
+ ruleflow-group "if Duty Pump N Equal Nmin for 1min"
+ no-loop
+    when 
+         Pipeline($pms:pumps)
+         $pm:Pump(duty==true) from $pms
+         $bs:Basic()
+    
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+           Timer timer = new Timer();
+    	while (true) {
+              if(services.isDataUpdated(Data.Pump))
+                services.updateData(Data.Pump);
+				if ($pm.speed == $bs.Nmin) {
+					// low limit
+					if (!timer.isBegin())
+						timer.Begin();
+				} else
+					timer.Reset();
+
+				if (timer.GetElapsedTime() > 5000)
+					break;
+               Thread.sleep(100);
+			}
+end
+
+rule "Stop Duty Pump"
+ ruleflow-group "Stop Duty Pump"
+ no-loop
+    when 
+        $pl: Pipeline()
+        $pm:Pump(duty==true) from $pl.pumps    
+     
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+        $pm.cmdSpeed=0;
+        $pm.duty=false;
+        services.move($pm.pumpNo);
+        
+        int prePumpNo=$pm.pumpNo-1<1?$pl.pumps.length:$pm.pumpNo-1;
+        $pl.pumps[prePumpNo-1].duty=true;
+        update($pl)
+end
+
+
+rule "Set Pn-1 as Duty Pump"
+ ruleflow-group "Set Pn-1 as Duty Pump"
+ no-loop
+    when 
+      
+        $ts:Timestamp()
+    then
+        modify($ts){currentTimeMillis=System.currentTimeMillis()};
+        System.out.println("["+$ts.currentTimeMillis+"]"+drools.getRule().getName());
+        
+end
